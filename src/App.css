@@ -1,38 +1,137 @@
-.App {
+.login {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.login-box {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 30px;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  width: 300px;
   text-align: center;
 }
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+body {
+  margin: 0;
+  font-family: "Segoe UI", sans-serif;
+  background: linear-gradient(135deg, #ff4d88, #ff99bb);
   color: white;
 }
 
-.App-link {
-  color: #61dafb;
+/* HEADER */
+.header {
+  text-align: center;
+  margin-top: 20px;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
+.header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 5px;
+}
+
+.subtitle {
+  opacity: 0.9;
+  font-size: 1rem;
+}
+
+/* MAIN */
+.app {
+  text-align: center;
+}
+
+.container {
+  display: flex;
+  justify-content: center;
+  gap: 25px;
+  margin-top: 30px;
+  flex-wrap: wrap;
+}
+
+/* CARD */
+.panel {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  padding: 20px;
+  border-radius: 16px;
+  width: 320px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.panel h3 {
+  margin-bottom: 10px;
+}
+
+/* INPUT */
+input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  margin: 10px 0;
+}
+
+/* BUTTON */
+button {
+  width: 100%;
+  padding: 12px;
+  background: #ff2e73;
+  border: none;
+  color: white;
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+button:hover {
+  background: #e6005c;
+  transform: scale(1.05);
+}
+
+/* IMAGE */
+img {
+  width: 100%;
+  margin-top: 10px;
+  border-radius: 12px;
+}
+
+/* LOADER */
+.loader {
+  border: 6px solid #fff;
+  border-top: 6px solid #ff2e73;
+  border-radius: 50%;
+  width: 45px;
+  height: 45px;
+  animation: spin 1s linear infinite;
+  margin: auto;
+}
+
+@keyframes spin {
+  100% {
     transform: rotate(360deg);
   }
+}
+
+/* RESULT */
+.result-card {
+  text-align: center;
+}
+
+.red {
+  color: #ff1a4d;
+}
+
+.green {
+  color: #00ff99;
+}
+
+.message {
+  margin-top: 12px;
+  font-size: 0.95rem;
+}
+
+.placeholder {
+  opacity: 0.8;
 }

@@ -2,21 +2,19 @@ import React, { useState } from "react";
 import "./App.css";
 import { Bar } from "react-chartjs-2";
 import "chart.js/auto";
+import { Client } from "@gradio/client"; // ✅ FIXED POSITION
 
 function App() {
-  // LOGIN STATE
   const [loggedIn, setLoggedIn] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  // APP STATE
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState("");
   const [confidence, setConfidence] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  // LOGIN FUNCTION
   const handleLogin = () => {
     if (username === "admin" && password === "1234") {
       setLoggedIn(true);
@@ -25,7 +23,6 @@ function App() {
     }
   };
 
-  // IMAGE HANDLER
   const handleImage = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -34,48 +31,54 @@ function App() {
     setPreview(URL.createObjectURL(file));
   };
 
-  // ✅ API CALL (FINAL FIX FOR GRADIO)
-import { Client } from "@gradio/client";
+  // ✅ FIXED PREDICT FUNCTION
+  const predict = async () => {
+    if (!image) {
+      alert("Upload image first");
+      return;
+    }
 
-const predict = async () => {
-  if (!image) {
-    alert("Upload image first");
-    return;
-  }
+    setLoading(true);
 
-  setLoading(true);
+    try {
+      // convert to base64
+      const toBase64 = (file) =>
+        new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+        });
 
-  try {
-    const client = await Client.connect(
-      "https://anil2111-cnn-backend.hf.space/"
-    );
+      const base64 = await toBase64(image);
 
-    const result = await client.predict("/predict", {
-      image_input: image, // 👈 EXACT name from config
-    });
+      const client = await Client.connect(
+        "anil2111/cnn_backend" // ✅ use space name (more stable)
+      );
 
-    console.log(result);
+      const res = await client.predict("/predict", {
+        image_input: base64, // ✅ FIXED
+      });
 
-    const output = result.data;
+      console.log("RESULT:", res);
 
-    // Example: "Prediction: Benign | Confidence: 92.3%"
-    const parts = output.split("|");
+      const output = res.data;
 
-    const prediction = parts[0].split(":")[1].trim();
-    const confidence = parseFloat(parts[1].split(":")[1]);
+      const parts = output.split("|");
+      const prediction = parts[0].split(":")[1].trim();
+      const conf = parseFloat(parts[1].split(":")[1]);
 
-    setResult(prediction);
-    setConfidence(confidence);
+      setResult(prediction);
+      setConfidence(conf);
 
-  } catch (err) {
-    console.error(err);
-    alert("Backend error");
-  }
+    } catch (err) {
+      console.error(err);
+      alert("Backend error");
+    }
 
-  setLoading(false);
-};
+    setLoading(false);
+  };
 
-  // ✅ CHART DATA (YOU MISSED THIS EARLIER)
   const chartData = {
     labels: ["Confidence"],
     datasets: [
@@ -87,7 +90,6 @@ const predict = async () => {
     ],
   };
 
-  // 🔐 LOGIN PAGE
   if (!loggedIn) {
     return (
       <div className="login">
@@ -112,7 +114,6 @@ const predict = async () => {
     );
   }
 
-  // MAIN UI
   return (
     <div className="app">
       <div className="header">
@@ -123,7 +124,6 @@ const predict = async () => {
       </div>
 
       <div className="container">
-        {/* LEFT */}
         <div className="panel">
           <h3>Upload Mammogram</h3>
 
@@ -131,10 +131,11 @@ const predict = async () => {
 
           {preview && <img src={preview} alt="preview" />}
 
-          <button onClick={predict}>Analyze Image</button>
+          <button onClick={predict}>
+            {loading ? "Processing..." : "Analyze Image"}
+          </button>
         </div>
 
-        {/* RIGHT */}
         <div className="panel">
           {loading ? (
             <div className="loader"></div>
@@ -155,7 +156,9 @@ const predict = async () => {
               </div>
             </div>
           ) : (
-            <p className="placeholder">Upload image to start analysis</p>
+            <p className="placeholder">
+              Upload image to start analysis
+            </p>
           )}
         </div>
       </div>

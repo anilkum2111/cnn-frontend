@@ -2,18 +2,20 @@ import React, { useState } from "react";
 import "./App.css";
 import { Bar } from "react-chartjs-2";
 import "chart.js/auto";
-import { Client } from "@gradio/client"; // ✅ FIXED POSITION
+import { Client } from "@gradio/client";
+
+const SPACE = "anil2111/cnn_backend";
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState("");
   const [confidence, setConfidence] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleLogin = () => {
     if (username === "admin" && password === "1234") {
@@ -26,12 +28,12 @@ function App() {
   const handleImage = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     setImage(file);
     setPreview(URL.createObjectURL(file));
+    setResult("");
+    setError("");
   };
 
-  // ✅ FIXED PREDICT FUNCTION
   const predict = async () => {
     if (!image) {
       alert("Upload image first");
@@ -39,41 +41,43 @@ function App() {
     }
 
     setLoading(true);
+    setError("");
+    setResult("");
 
     try {
-      // convert to base64
-      const toBase64 = (file) =>
-        new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-        });
+      const client = await Client.connect(SPACE);
 
-      const base64 = await toBase64(image);
+      // ✅ Step 1: Upload the file to Gradio first
+      const uploadedFile = await client.upload_file(image);
+      console.log("UPLOADED FILE:", uploadedFile);
 
-      const client = await Client.connect(
-        "anil2111/cnn_backend" // ✅ use space name (more stable)
-      );
-
+      // ✅ Step 2: Use uploaded file path in predict
       const res = await client.predict("/predict", {
-        image_input: base64, // ✅ FIXED
+        image_input: uploadedFile,
       });
 
-      console.log("RESULT:", res);
+      console.log("RAW RESULT:", res);
 
-      const output = res.data;
+      // ✅ Output is a plain string e.g. "Prediction: Benign | Confidence: 92.3%"
+      const output = res.data[0];
+      console.log("OUTPUT STRING:", output);
 
-      const parts = output.split("|");
-      const prediction = parts[0].split(":")[1].trim();
-      const conf = parseFloat(parts[1].split(":")[1]);
-
-      setResult(prediction);
-      setConfidence(conf);
+      // Parse the string
+      if (output.includes("|")) {
+        const parts = output.split("|");
+        const prediction = parts[0].split(":")[1].trim();
+        const conf = parseFloat(parts[1].replace(/[^0-9.]/g, ""));
+        setResult(prediction);
+        setConfidence(conf);
+      } else {
+        // fallback if format is different
+        setResult(output);
+        setConfidence(0);
+      }
 
     } catch (err) {
-      console.error(err);
-      alert("Backend error");
+      console.error("FULL ERROR:", err);
+      setError(err.message || "Backend error. Check console.");
     }
 
     setLoading(false);
@@ -81,13 +85,11 @@ function App() {
 
   const chartData = {
     labels: ["Confidence"],
-    datasets: [
-      {
-        label: "Confidence %",
-        data: [confidence],
-        backgroundColor: ["#ff4d88"],
-      },
-    ],
+    datasets: [{
+      label: "Confidence %",
+      data: [confidence],
+      backgroundColor: ["#ff4d88"],
+    }],
   };
 
   if (!loggedIn) {
@@ -96,18 +98,8 @@ function App() {
         <div className="login-box">
           <h2>🎗️ Breast Cancer Detection</h2>
           <p className="subtitle">Secure Login</p>
-
-          <input
-            placeholder="Username"
-            onChange={(e) => setUsername(e.target.value)}
-          />
-
-          <input
-            type="password"
-            placeholder="Password"
-            onChange={(e) => setPassword(e.target.value)}
-          />
-
+          <input placeholder="Username" onChange={(e) => setUsername(e.target.value)} />
+          <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
           <button onClick={handleLogin}>Login</button>
         </div>
       </div>
@@ -118,20 +110,15 @@ function App() {
     <div className="app">
       <div className="header">
         <h1>🎗️ Breast Cancer Detection</h1>
-        <p className="subtitle">
-          AI-powered diagnosis using deep learning
-        </p>
+        <p className="subtitle">AI-powered diagnosis using deep learning</p>
       </div>
 
       <div className="container">
         <div className="panel">
           <h3>Upload Mammogram</h3>
-
-          <input type="file" onChange={handleImage} />
-
+          <input type="file" accept="image/*" onChange={handleImage} />
           {preview && <img src={preview} alt="preview" />}
-
-          <button onClick={predict}>
+          <button onClick={predict} disabled={loading}>
             {loading ? "Processing..." : "Analyze Image"}
           </button>
         </div>
@@ -139,16 +126,18 @@ function App() {
         <div className="panel">
           {loading ? (
             <div className="loader"></div>
+          ) : error ? (
+            <div className="result-card">
+              <p style={{ color: "red" }}>❌ {error}</p>
+              <p style={{ fontSize: "12px", color: "#999" }}>Check browser console for details</p>
+            </div>
           ) : result ? (
             <div className="result-card">
               <h2 className={result === "Malignant" ? "red" : "green"}>
                 {result}
               </h2>
-
               <p>{confidence.toFixed(2)}% Confidence</p>
-
               <Bar data={chartData} />
-
               <div className="message">
                 {result === "Malignant"
                   ? "⚠️ High risk detected. Consult a doctor."
@@ -156,9 +145,7 @@ function App() {
               </div>
             </div>
           ) : (
-            <p className="placeholder">
-              Upload image to start analysis
-            </p>
+            <p className="placeholder">Upload image to start analysis</p>
           )}
         </div>
       </div>

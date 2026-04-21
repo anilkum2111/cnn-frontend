@@ -45,39 +45,45 @@ function App() {
     setResult("");
 
     try {
+      console.log("Step 1: Connecting to Gradio...");
       const client = await Client.connect(SPACE);
+      console.log("Step 2: Connected! Client:", client);
 
-      // ✅ Step 1: Upload the file to Gradio first
-      const uploadedFile = await client.upload_file(image);
-      console.log("UPLOADED FILE:", uploadedFile);
+      console.log("Step 3: Uploading file...", image);
+      
+      // ✅ Upload file to get a Gradio-compatible filepath
+      const uploaded = await client.upload([image]);
+      console.log("Step 4: Upload result:", uploaded);
 
-      // ✅ Step 2: Use uploaded file path in predict
+      const gradioFile = uploaded[0];
+      console.log("Step 5: Gradio file object:", gradioFile);
+
+      console.log("Step 6: Running predict...");
       const res = await client.predict("/predict", {
-        image_input: uploadedFile,
+        image_input: gradioFile,
       });
 
-      console.log("RAW RESULT:", res);
-
-      // ✅ Output is a plain string e.g. "Prediction: Benign | Confidence: 92.3%"
+      console.log("Step 7: Predict result:", res);
       const output = res.data[0];
-      console.log("OUTPUT STRING:", output);
+      console.log("Step 8: Output string:", output);
 
-      // Parse the string
-      if (output.includes("|")) {
+      if (output && output.includes("|")) {
         const parts = output.split("|");
         const prediction = parts[0].split(":")[1].trim();
         const conf = parseFloat(parts[1].replace(/[^0-9.]/g, ""));
         setResult(prediction);
         setConfidence(conf);
       } else {
-        // fallback if format is different
-        setResult(output);
+        setResult(output || "Unknown");
         setConfidence(0);
       }
 
     } catch (err) {
-      console.error("FULL ERROR:", err);
-      setError(err.message || "Backend error. Check console.");
+      console.error("FAILED AT STEP - Full error:", err);
+      console.error("Error name:", err.name);
+      console.error("Error message:", err.message);
+      console.error("Error stack:", err.stack);
+      setError(err.message || "Backend error");
     }
 
     setLoading(false);
@@ -129,7 +135,9 @@ function App() {
           ) : error ? (
             <div className="result-card">
               <p style={{ color: "red" }}>❌ {error}</p>
-              <p style={{ fontSize: "12px", color: "#999" }}>Check browser console for details</p>
+              <p style={{ fontSize: "12px", color: "#999" }}>
+                Check browser console (F12) for Step number where it failed
+              </p>
             </div>
           ) : result ? (
             <div className="result-card">

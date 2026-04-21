@@ -34,7 +34,7 @@ function App() {
     setPreview(URL.createObjectURL(file));
   };
 
-  // API CALL
+  // ✅ API CALL (FINAL FIX FOR GRADIO)
   const predict = async () => {
     if (!image) {
       alert("Upload image first");
@@ -43,30 +43,54 @@ function App() {
 
     setLoading(true);
 
-    const formData = new FormData();
-    formData.append("file", image);
-
     try {
+      // Convert image to base64
+      const toBase64 = (file) =>
+        new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = (error) => reject(error);
+        });
+
+      const base64Image = await toBase64(image);
+
       const res = await fetch(
-          "https://anil2111-cnn-backend.hf.space/analyze",
+        "https://anil2111-cnn-backend.hf.space/run/predict",
         {
           method: "POST",
-          body: formData,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            data: [base64Image], // ✅ correct format for Gradio
+          }),
         }
       );
 
       const data = await res.json();
+      console.log("RESPONSE:", data);
 
-      setResult(data.prediction);
-      setConfidence(data.confidence);
+      const output = data.data[0];
+
+      // Example: "Prediction: Benign | Confidence: 92.3%"
+      const parts = output.split("|");
+
+      const prediction = parts[0].split(":")[1].trim();
+      const conf = parseFloat(parts[1].split(":")[1]);
+
+      setResult(prediction);
+      setConfidence(conf);
+
     } catch (err) {
-      alert("Backend error");
       console.error(err);
+      alert("Backend error");
     }
 
     setLoading(false);
   };
 
+  // ✅ CHART DATA (YOU MISSED THIS EARLIER)
   const chartData = {
     labels: ["Confidence"],
     datasets: [

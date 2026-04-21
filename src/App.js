@@ -47,25 +47,18 @@ function App() {
     try {
       console.log("Step 1: Connecting to Gradio...");
       const client = await Client.connect(SPACE);
-      console.log("Step 2: Connected! Client:", client);
+      console.log("Step 2: Connected!");
 
-      console.log("Step 3: Uploading file...", image);
-      
-      // ✅ Upload file to get a Gradio-compatible filepath
-      const uploaded = await client.upload([image]);
-      console.log("Step 4: Upload result:", uploaded);
+      console.log("Step 3: Predicting with file blob...");
 
-      const gradioFile = uploaded[0];
-      console.log("Step 5: Gradio file object:", gradioFile);
-
-      console.log("Step 6: Running predict...");
+      // ✅ Pass File object directly — Gradio JS client handles upload internally
       const res = await client.predict("/predict", {
-        image_input: gradioFile,
+        image_input: image,
       });
 
-      console.log("Step 7: Predict result:", res);
+      console.log("Step 4: Result:", res);
       const output = res.data[0];
-      console.log("Step 8: Output string:", output);
+      console.log("Step 5: Output:", output);
 
       if (output && output.includes("|")) {
         const parts = output.split("|");
@@ -79,10 +72,7 @@ function App() {
       }
 
     } catch (err) {
-      console.error("FAILED AT STEP - Full error:", err);
-      console.error("Error name:", err.name);
-      console.error("Error message:", err.message);
-      console.error("Error stack:", err.stack);
+      console.error("FAILED:", err.message);
       setError(err.message || "Backend error");
     }
 
@@ -104,8 +94,15 @@ function App() {
         <div className="login-box">
           <h2>🎗️ Breast Cancer Detection</h2>
           <p className="subtitle">Secure Login</p>
-          <input placeholder="Username" onChange={(e) => setUsername(e.target.value)} />
-          <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
+          <input
+            placeholder="Username"
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            onChange={(e) => setPassword(e.target.value)}
+          />
           <button onClick={handleLogin}>Login</button>
         </div>
       </div>
@@ -136,7 +133,7 @@ function App() {
             <div className="result-card">
               <p style={{ color: "red" }}>❌ {error}</p>
               <p style={{ fontSize: "12px", color: "#999" }}>
-                Check browser console (F12) for Step number where it failed
+                Check browser console (F12) for details
               </p>
             </div>
           ) : result ? (

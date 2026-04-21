@@ -48,7 +48,7 @@ function App() {
 
     try {
       const res = await fetch(
-        "https://anil2111-cnn-backend.hf.space/predict",
+          "https://anil2111-cnn-backend.hf.space/predict",
         {
           method: "POST",
           body: formData,

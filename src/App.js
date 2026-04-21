@@ -35,6 +35,8 @@ function App() {
   };
 
   // ✅ API CALL (FINAL FIX FOR GRADIO)
+import { Client } from "@gradio/client";
+
 const predict = async () => {
   if (!image) {
     alert("Upload image first");
@@ -44,44 +46,19 @@ const predict = async () => {
   setLoading(true);
 
   try {
-    const toBase64 = (file) =>
-      new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-      });
-
-    const base64Image = await toBase64(image);
-
-    const res = await fetch(
-      "https://anil2111-cnn-backend.hf.space/gradio_api/predict",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          data: [
-            {
-              path: null,
-              url: base64Image,
-            },
-          ],
-        }),
-      }
+    const client = await Client.connect(
+      "https://anil2111-cnn-backend.hf.space/"
     );
 
-    const data = await res.json();
-    console.log("RESPONSE:", data);
+    const result = await client.predict("/predict", {
+      image_input: image, // 👈 EXACT name from config
+    });
 
-    if (!data.data) {
-      alert("Invalid response from backend");
-      return;
-    }
+    console.log(result);
 
-    const output = data.data[0];
+    const output = result.data;
 
+    // Example: "Prediction: Benign | Confidence: 92.3%"
     const parts = output.split("|");
 
     const prediction = parts[0].split(":")[1].trim();

@@ -35,60 +35,68 @@ function App() {
   };
 
   // ✅ API CALL (FINAL FIX FOR GRADIO)
-  const predict = async () => {
-    if (!image) {
-      alert("Upload image first");
+const predict = async () => {
+  if (!image) {
+    alert("Upload image first");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const toBase64 = (file) =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+      });
+
+    const base64Image = await toBase64(image);
+
+    const res = await fetch(
+      "https://anil2111-cnn-backend.hf.space/gradio_api/predict",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          data: [
+            {
+              path: null,
+              url: base64Image,
+            },
+          ],
+        }),
+      }
+    );
+
+    const data = await res.json();
+    console.log("RESPONSE:", data);
+
+    if (!data.data) {
+      alert("Invalid response from backend");
       return;
     }
 
-    setLoading(true);
+    const output = data.data[0];
 
-    try {
-      // Convert image to base64
-      const toBase64 = (file) =>
-        new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = (error) => reject(error);
-        });
+    const parts = output.split("|");
 
-      const base64Image = await toBase64(image);
+    const prediction = parts[0].split(":")[1].trim();
+    const confidence = parseFloat(parts[1].split(":")[1]);
 
-      const res = await fetch(
-        "https://anil2111-cnn-backend.hf.space/run/predict",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            data: [base64Image], // ✅ correct format for Gradio
-          }),
-        }
-      );
+    setResult(prediction);
+    setConfidence(confidence);
 
-      const data = await res.json();
-      console.log("RESPONSE:", data);
+  } catch (err) {
+    console.error(err);
+    alert("Backend error");
+  }
 
-      const output = data.data[0];
-
-      // Example: "Prediction: Benign | Confidence: 92.3%"
-      const parts = output.split("|");
-
-      const prediction = parts[0].split(":")[1].trim();
-      const conf = parseFloat(parts[1].split(":")[1]);
-
-      setResult(prediction);
-      setConfidence(conf);
-
-    } catch (err) {
-      console.error(err);
-      alert("Backend error");
-    }
-
-    setLoading(false);
-  };
+  setLoading(false);
+};
 
   // ✅ CHART DATA (YOU MISSED THIS EARLIER)
   const chartData = {

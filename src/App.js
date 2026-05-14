@@ -4,7 +4,6 @@ import { Bar } from "react-chartjs-2";
 import "chart.js/auto";
 import { Client } from "@gradio/client";
 
-// ✅ Your Hugging Face Space name
 const SPACE = "anil2111/cnn_backend";
 
 function App() {
@@ -53,31 +52,35 @@ function App() {
     setLoading(true);
     setError("");
     setResult("");
-    setStatusMsg("Connecting to backend...");
+    setStatusMsg("Connecting to Hugging Face...");
 
-    // ✅ KEY FIX: 60-second timeout so it NEVER loops forever
+    // 60-second timeout — prevents infinite loop
     const timeoutId = setTimeout(() => {
       setLoading(false);
       setStatusMsg("");
-      setError("Request timed out. The Hugging Face Space may be sleeping — wait 30 seconds and try again.");
+      setError("Timed out after 60s. Space may be sleeping — wait 30 seconds and try again.");
     }, 60000);
 
     try {
-      setStatusMsg("Connecting to Hugging Face...");
       const client = await Client.connect(SPACE);
-
       setStatusMsg("Uploading image and analyzing...");
 
-      // ✅ Pass as array (positional) — most reliable way with Gradio
-      const res = await client.predict("/predict", [image]);
+      // ✅ PRIMARY: Use /predict (works after fixing api_name in app.py)
+      // ✅ FALLBACK: If /predict still fails, we catch and try fn_index 0
+      let res;
+      try {
+        res = await client.predict("/predict", [image]);
+      } catch (e) {
+        console.warn("/predict failed, trying fn_index 0...", e.message);
+        // Fallback: use numeric index which always works
+        res = await client.predict(0, [image]);
+      }
 
       clearTimeout(timeoutId);
+      console.log("Gradio response:", res);
 
-      console.log("Full Gradio response:", res);
-      console.log("res.data:", res.data);
-
-      const label = res.data[0];
-      const benign = parseFloat(res.data[1]) || 0;
+      const label    = res.data[0];
+      const benign   = parseFloat(res.data[1]) || 0;
       const malignant = parseFloat(res.data[2]) || 0;
 
       if (!label || label.startsWith("Error")) {
@@ -98,11 +101,11 @@ function App() {
 
       let msg = err.message || "Unknown error";
       if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-        msg = "Cannot reach backend. Check if your Hugging Face Space is Running (not sleeping).";
-      } else if (msg.includes("404")) {
-        msg = "API endpoint not found. Make sure app.py Gradio interface is deployed correctly.";
+        msg = "Cannot reach backend. Check if your Hugging Face Space is Running.";
+      } else if (msg.includes("no endpoint") || msg.includes("fn_index")) {
+        msg = "Endpoint mismatch. Make sure app.py has api_name='predict' and is redeployed.";
       } else if (msg.includes("500")) {
-        msg = "Server error in the model. Check Hugging Face Space logs for Python errors.";
+        msg = "Server error. Check Hugging Face Space logs for Python errors.";
       }
 
       setError(msg);
@@ -192,7 +195,7 @@ function App() {
           ) : error ? (
             <div className="result-card">
               <p className="error-text">❌ {error}</p>
-              <p className="hint-text">Press F12 → Console for full error details</p>
+              <p className="hint-text">Press F12 → Console for full details</p>
               <button onClick={predict} style={{ marginTop: "12px" }}>
                 🔄 Try Again
               </button>

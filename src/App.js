@@ -4,7 +4,7 @@ import { Bar } from "react-chartjs-2";
 import "chart.js/auto";
 import { Client } from "@gradio/client";
 
-// ✅ FIX #1: Make sure this matches your actual Hugging Face Space name exactly
+// ✅ Your Hugging Face Space name
 const SPACE = "anil2111/cnn_backend";
 
 function App() {
@@ -18,6 +18,7 @@ function App() {
   const [malignantConf, setMalignantConf] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [statusMsg, setStatusMsg] = useState("");
 
   const handleLogin = () => {
     if (username === "admin" && password === "1234") {
@@ -27,7 +28,6 @@ function App() {
     }
   };
 
-  // ✅ FIX #2: Support pressing Enter key to login
   const handleLoginKeyDown = (e) => {
     if (e.key === "Enter") handleLogin();
   };
@@ -39,6 +39,7 @@ function App() {
     setPreview(URL.createObjectURL(file));
     setResult("");
     setError("");
+    setStatusMsg("");
     setBenignConf(0);
     setMalignantConf(0);
   };
@@ -52,51 +53,65 @@ function App() {
     setLoading(true);
     setError("");
     setResult("");
+    setStatusMsg("Connecting to backend...");
+
+    // ✅ KEY FIX: 60-second timeout so it NEVER loops forever
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setStatusMsg("");
+      setError("Request timed out. The Hugging Face Space may be sleeping — wait 30 seconds and try again.");
+    }, 60000);
 
     try {
+      setStatusMsg("Connecting to Hugging Face...");
       const client = await Client.connect(SPACE);
 
-      // ✅ FIX #3: The Gradio backend (fixed app.py) now returns 3 separate outputs:
-      //    res.data[0] = label ("Benign" or "Malignant")
-      //    res.data[1] = benign confidence (number)
-      //    res.data[2] = malignant confidence (number)
-      const res = await client.predict("/predict", {
-        image: image, // ✅ FIX #4: Parameter name must match Gradio fn input name
-      });
+      setStatusMsg("Uploading image and analyzing...");
 
-      console.log("Gradio response:", res);
+      // ✅ Pass as array (positional) — most reliable way with Gradio
+      const res = await client.predict("/predict", [image]);
 
-      const label = res.data[0];           // "Benign" or "Malignant"
-      const benign = parseFloat(res.data[1]);     // e.g. 23.5
-      const malignant = parseFloat(res.data[2]);  // e.g. 76.5
+      clearTimeout(timeoutId);
 
-      // ✅ FIX #5: No string parsing needed — data comes back as proper values
-      if (!label) {
-        setError("No result returned from model");
+      console.log("Full Gradio response:", res);
+      console.log("res.data:", res.data);
+
+      const label = res.data[0];
+      const benign = parseFloat(res.data[1]) || 0;
+      const malignant = parseFloat(res.data[2]) || 0;
+
+      if (!label || label.startsWith("Error")) {
+        setError(label || "Model returned no result. Check Hugging Face Space logs.");
         setLoading(false);
+        setStatusMsg("");
         return;
       }
 
       setResult(label);
-      setBenignConf(isNaN(benign) ? 0 : benign);
-      setMalignantConf(isNaN(malignant) ? 0 : malignant);
+      setBenignConf(benign);
+      setMalignantConf(malignant);
+      setStatusMsg("");
 
     } catch (err) {
-      console.error("Prediction failed:", err);
-      // ✅ FIX #6: Show a friendlier, more informative error message
-      if (err.message?.includes("Cannot read")) {
-        setError("Model is loading on Hugging Face. Please wait 30 seconds and try again.");
-      } else if (err.message?.includes("fetch")) {
-        setError("Cannot connect to backend. Check if your Hugging Face Space is running.");
-      } else {
-        setError(err.message || "Backend error. Check console for details.");
+      clearTimeout(timeoutId);
+      console.error("Prediction error:", err);
+
+      let msg = err.message || "Unknown error";
+      if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+        msg = "Cannot reach backend. Check if your Hugging Face Space is Running (not sleeping).";
+      } else if (msg.includes("404")) {
+        msg = "API endpoint not found. Make sure app.py Gradio interface is deployed correctly.";
+      } else if (msg.includes("500")) {
+        msg = "Server error in the model. Check Hugging Face Space logs for Python errors.";
       }
+
+      setError(msg);
+      setStatusMsg("");
     }
 
     setLoading(false);
   };
 
-  // ✅ FIX #7: Chart now shows TWO bars — Benign vs Malignant
   const chartData = {
     labels: ["Benign", "Malignant"],
     datasets: [{
@@ -125,6 +140,8 @@ function App() {
     },
   };
 
+  const displayConf = result === "Malignant" ? malignantConf : benignConf;
+
   if (!loggedIn) {
     return (
       <div className="login">
@@ -148,9 +165,6 @@ function App() {
     );
   }
 
-  // ✅ FIX #8: Determine dominant confidence for display
-  const displayConf = result === "Malignant" ? malignantConf : benignConf;
-
   return (
     <div className="app">
       <div className="header">
@@ -172,17 +186,19 @@ function App() {
           {loading ? (
             <div className="loader-wrapper">
               <div className="loader"></div>
-              <p className="loader-text">Analyzing mammogram...</p>
+              <p className="loader-text">{statusMsg || "Analyzing..."}</p>
+              <p className="hint-text">May take 20–30 sec if Space was sleeping</p>
             </div>
           ) : error ? (
             <div className="result-card">
-              {/* ✅ FIX #9: Error uses CSS class, not inline style */}
               <p className="error-text">❌ {error}</p>
-              <p className="hint-text">Open browser console (F12) for details</p>
+              <p className="hint-text">Press F12 → Console for full error details</p>
+              <button onClick={predict} style={{ marginTop: "12px" }}>
+                🔄 Try Again
+              </button>
             </div>
           ) : result ? (
             <div className="result-card">
-              {/* ✅ FIX #10: Malignant vs Benign now correctly color-coded */}
               <h2 className={result === "Malignant" ? "red" : "green"}>
                 {result}
               </h2>
